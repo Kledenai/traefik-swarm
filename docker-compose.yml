@@ -1,0 +1,45 @@
+version: '3.7'
+services:
+  whoami0:
+    image: containous/whoami
+    deploy:
+      labels:
+        - traefik.port=80
+      mode: replicated
+      replicas: 1
+    networks:
+      - traefik
+  whoami1:
+    image: containous/whoami
+    deploy:
+      labels:
+        - traefik.port=80
+        - traefik.backend.loadbalancer.sticky=true
+      mode: replicated
+      replicas: 1
+    networks:
+      - traefik
+  traefik:
+    image: traefik:1.7
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+    command:
+      - --api
+      - --docker
+      - --docker.watch
+      - --docker.swarmmode
+      - --docker.domain=traefik
+    ports:
+      - 80:80
+      - 8080:8080
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    networks:
+      - traefik
+
+networks:
+  traefik:
+    driver: overlay
+    name: traefik
