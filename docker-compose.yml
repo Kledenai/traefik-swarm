@@ -1,45 +1,59 @@
-version: '3.7'
+version: '3.2'
 services:
-  whoami0:
-    image: containous/whoami
-    deploy:
-      labels:
-        - traefik.port=80
-      mode: replicated
-      replicas: 1
-    networks:
-      - traefik
-  whoami1:
-    image: containous/whoami
-    deploy:
-      labels:
-        - traefik.port=80
-        - traefik.backend.loadbalancer.sticky=true
-      mode: replicated
-      replicas: 1
-    networks:
-      - traefik
   traefik:
     image: traefik:1.7
     deploy:
+      mode: global
       placement:
         constraints:
           - node.role == manager
+      update_config:
+        parallelism: 1
+        delay: 10s
+      restart_policy:
+        condition: on-failure
     command:
-      - --api
-      - --docker
-      - --docker.watch
-      - --docker.swarmmode
-      - --docker.domain=traefik
+      - "--api"
+      - "--acme"
+      - "--docker"
+      - "--docker.watch"
+      - "--docker.swarmmode"
+      # - "--docker.domain=traefik"
+      - "--acme.storage=/etc/traefik/acme/acme.json"
+      - "--acme.entryPoint=https"
+      - "--acme.httpChallenge.entryPoint=http"
+      - "--acme.onHostRule=true"
+      - "--acme.email=desenvolvimento@khaneland.com.br"
+      - "--entrypoints=Name:http Address::80 Redirect.EntryPoint:https"
+      - "--entrypoints=Name:https Address::443 TLS"
+      - "--defaultentrypoints=http,https"
+      - "--traefikLog.filePath=/tmp/logs/traefik.log"
+      - "--logLevel=DEBUG"
+      - "--accesslog"
+      - "--accessLog.filePath=/tmp/logs/access.log"
     ports:
       - 80:80
+      - 443:443
       - 8080:8080
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
+      - "/home/bruno/acme.json:/etc/traefik/acme/acme.json"
     networks:
       - traefik
+
+  whoami:
+    image: containous/whoami
+    deploy:
+      labels:
+        - "traefik.frontend.rule=Host:traefik.khaneland.com.br"
+        - "traefik.port=80"
+        - "traefik.docker.network=traefik"
+      mode: replicated
+      replicas: 1
+    networks:
+      - traefik
+
 
 networks:
   traefik:
     driver: overlay
-    name: traefik
